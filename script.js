@@ -62,10 +62,10 @@ function hideLoading() {
 
 // --- end Loading screen ---
 
-// --- AI engine (Gemini 1.5 Flash) ---
+// --- AI engine (Gemini 2.5 Flash) ---
 
 /**
- * Send notes text to the Gemini 1.5 Flash API and receive a JSON array of
+ * Send notes text to the Gemini 2.5 Flash API and receive a JSON array of
  * punchy, standalone study sentences (max 12 words each).
  * @param {string} text - Raw notes text from the user.
  * @returns {Promise<string[]>} Array of sentence strings.
