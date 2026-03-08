@@ -4,12 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Shift — Meditations</title>
-
-  <!-- Optional: a dignified serif -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-
   <link rel="stylesheet" href="style.css" />
 </head>
 
@@ -21,40 +15,39 @@
         <p class="subtle">Stoic typing practice with Marcus Aurelius’ <em>Meditations</em>.</p>
       </div>
 
-      <div class="header__right subtle">
+      <div class="header__right">
         <span class="hint">Enter: next</span>
         <span class="hint">Esc: restart</span>
       </div>
     </header>
 
     <section class="panel">
-      <div class="meta">
-        <div class="pill">Sentence <span id="idx">–</span>/<span id="total">–</span></div>
-        <div class="pill">WPM <span id="wpm">0</span></div>
-        <div class="pill">Accuracy <span id="acc">0</span>%</div>
-        <div class="pill subtle">Best <span id="best">–</span></div>
-        <div class="pill subtle">Focus <span id="focus">–</span></div>
+      <div id="stats" class="stats" aria-live="polite">
+        <span>Sentence <strong id="idx">–</strong>/<strong id="total">–</strong></span>
+        <span>WPM <strong id="wpm">0</strong></span>
+        <span>Accuracy <strong id="acc">0</strong>%</span>
+        <span>Best <strong id="best">–</strong></span>
       </div>
 
-      <div class="typewrap">
-        <div id="typebox" class="typebox" tabindex="0" role="textbox" aria-label="Typing area">
-          <div id="sentence" class="sentence" aria-live="polite"></div>
-          <div id="caret" class="caret" aria-hidden="true"></div>
-        </div>
+      <div class="type-area" id="type-area">
+        <div id="target-text" aria-label="Target text"></div>
+
+        <!-- Hidden but functional input -->
+        <input
+          id="input-field"
+          type="text"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          aria-label="Typing input"
+        />
       </div>
 
-      <div class="below">
-        <div id="feedback" class="feedback subtle"></div>
-
-        <div class="weak">
-          <div class="weak__title subtle">Slow letters (session)</div>
-          <div id="weakList" class="weak__list subtle">–</div>
-        </div>
-      </div>
+      <div id="feedback" class="feedback subtle"></div>
     </section>
 
     <footer class="footer subtle">
-      Click the text area to focus. Your stats are kept only for this session (no saving).
+      Click the text area to focus. Stats are session-only (no saving).
     </footer>
   </main>
 
