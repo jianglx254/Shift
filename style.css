@@ -25,7 +25,7 @@ body{ min-height: 100%; position: relative; }
 body{
   background-color: var(--bg);
   color: var(--text);
-  font-family: Georgia, ui-serif, "Times New Roman", Times, serif;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   display: flex;
   flex-direction: column;
@@ -88,7 +88,6 @@ body::after{
 }
 
 .loading-label{
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 14px;
   letter-spacing: 2px;
   color: var(--accent);
@@ -165,7 +164,6 @@ h1{ margin: 0; font-weight: 700; letter-spacing: 0.3px; }
   align-items: center;
   margin-bottom: 14px;
 
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 13px;
   color: var(--accent);
 }
@@ -350,7 +348,6 @@ h1{ margin: 0; font-weight: 700; letter-spacing: 0.3px; }
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 13px;
   padding: 10px;
   resize: vertical;
@@ -410,7 +407,6 @@ h1{ margin: 0; font-weight: 700; letter-spacing: 0.3px; }
   border-radius: 999px;
   padding: 4px 12px;
   font-size: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   color: var(--muted);
   background: rgba(0,245,255,0.05);
   letter-spacing: 0.5px;
