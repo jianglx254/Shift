@@ -1,4 +1,4 @@
-const API_KEY = "AIzaSyDuzeYVDeV_N6NwqsfVv4bXUuHBj19xB4M"; // Injected at deploy time — never commit real keys to source control
+const API_KEY = window.GEMINI_API_KEY || "REPLACE_ME_AT_BUILD_TIME";
 
 
 
