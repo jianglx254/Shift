@@ -1,4 +1,5 @@
 const TEXT_URL = "texts/meditations.txt";
+const WEAK_KEYS_STORAGE_KEY = "shift_weak_keys";
 
 const elTarget = document.getElementById("target-text");
 const elInput = document.getElementById("input-field");
@@ -10,6 +11,7 @@ const elBest = document.getElementById("best");
 const elIdx = document.getElementById("idx");
 const elTotal = document.getElementById("total");
 const elFeedback = document.getElementById("feedback");
+const elWeakKey = document.getElementById("weak-key");
 
 let sentences = [];
 let sentenceIndex = 0;
@@ -18,6 +20,10 @@ let target = "";
 let targetTokens = []; // pre-split tokens for the active target sentence
 let startedAt = null;
 let bestWpm = null;
+
+// Per-character error tracking for the adaptive sentence selection
+let keyAccuracy = {};   // { char: errorCount } — persisted to localStorage
+let _prevTypedLen = 0;  // tracks input length between keystrokes to detect new characters
 
 // RAF render-throttling state
 let _rafId = 0;
@@ -98,6 +104,59 @@ function computeWpm(charsTyped, elapsedMs) {
   const words = charsTyped / 5;
   return Math.max(0, Math.round(words / minutes));
 }
+
+// --- Weak Keys helpers ---
+
+function loadWeakKeys() {
+  try {
+    const saved = localStorage.getItem(WEAK_KEYS_STORAGE_KEY);
+    if (saved) keyAccuracy = JSON.parse(saved);
+  } catch (err) {
+    console.warn("shift: could not load weak keys from localStorage:", err);
+    keyAccuracy = {};
+  }
+}
+
+let _saveWeakKeysTimer = 0;
+
+function saveWeakKeys() {
+  clearTimeout(_saveWeakKeysTimer);
+  _saveWeakKeysTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(WEAK_KEYS_STORAGE_KEY, JSON.stringify(keyAccuracy));
+    } catch (err) {
+      console.warn("shift: could not save weak keys to localStorage:", err);
+    }
+  }, 300);
+}
+
+function getWeakestKey() {
+  let maxErrors = 0;
+  let weakKey = null;
+  for (const [ch, count] of Object.entries(keyAccuracy)) {
+    if (count > maxErrors) {
+      maxErrors = count;
+      weakKey = ch;
+    }
+  }
+  return weakKey;
+}
+
+function findSentenceWithChar(ch) {
+  const candidates = [];
+  for (let i = 0; i < sentences.length; i++) {
+    if (i !== sentenceIndex && sentences[i].includes(ch)) candidates.push(i);
+  }
+  if (!candidates.length) return null;
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+function updateWeakKeyDisplay() {
+  const weakKey = getWeakestKey();
+  elWeakKey.textContent = weakKey ?? "–";
+}
+
+// --- end Weak Keys ---
 
 function updateProgressCssVar(typedLen, targetLen) {
   const pct = targetLen > 0 ? Math.min(100, Math.max(0, (typedLen / targetLen) * 100)) : 0;
@@ -187,6 +246,7 @@ function renderDiff(targetStr, typedStr) {
 function resetSentenceProgress() {
   elInput.value = "";
   startedAt = null;
+  _prevTypedLen = 0;
 
   elWpm.textContent = "0";
   elAcc.textContent = "0";
@@ -212,6 +272,14 @@ function setSentence(idx) {
 
 function nextSentence() {
   if (!sentences.length) return;
+  const weakKey = getWeakestKey();
+  if (weakKey) {
+    const idx = findSentenceWithChar(weakKey);
+    if (idx !== null) {
+      setSentence(idx);
+      return;
+    }
+  }
   const next = (sentenceIndex + 1) % sentences.length;
   setSentence(next);
 }
@@ -263,6 +331,18 @@ elInput.addEventListener("input", () => {
   const typed = elInput.value;
 
   if (startedAt === null && typed.length > 0) startedAt = Date.now();
+
+  // Track errors for each newly typed character
+  if (typed.length > _prevTypedLen) {
+    const pos = typed.length - 1;
+    if (pos < target.length && typed[pos] !== target[pos]) {
+      const ch = target[pos];
+      keyAccuracy[ch] = (keyAccuracy[ch] || 0) + 1;
+      saveWeakKeys();
+      updateWeakKeyDisplay();
+    }
+  }
+  _prevTypedLen = typed.length;
 
   const elapsed = startedAt ? (Date.now() - startedAt) : 0;
   elAcc.textContent = String(computeAccuracy(target, typed));
@@ -333,6 +413,8 @@ async function init() {
   bestWpm = null;
   elBest.textContent = "–";
 
+  loadWeakKeys();
+  updateWeakKeyDisplay();
   setSentence(0);
 }
 
