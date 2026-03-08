@@ -19,34 +19,44 @@ let startedAt = null;
 let bestWpm = null;
 
 function cleanPhilosophyText(rawText) {
-  const lines = String(rawText ?? "")
+  const normalized = String(rawText ?? "")
     .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .split("\n");
+    .replace(/\r/g, "\n");
 
-  const filteredLines = lines.filter((line) => {
-    const s = line.trim();
-    if (!s) return false;
+  // Truncate at THE END marker so copyright/acknowledgements are never processed
+  const endMatch = normalized.match(/(?:^|\n)[ \t]*THE END[ \t]*(?:\n|$)/i);
+  const content = endMatch ? normalized.slice(0, endMatch.index) : normalized;
 
-    if (s.includes("http")) return false;
-    if (/project\s+gutenberg/i.test(s)) return false;
-    if (/translated\s+by/i.test(s)) return false;
-    if (/[-—]{3,}/.test(s)) return false;
+  // Process paragraph by paragraph (split on blank lines) to prevent
+  // sentences from bleeding across paragraph boundaries
+  const paragraphs = content.split(/\n[ \t]*\n/);
+  const sentences = [];
 
-    if (/^book\s+((one|two|three|four|five|six|seven|eight|nine|ten)|[ivxlcdm]+)\s*$/i.test(s)) {
-      return false;
-    }
+  for (const para of paragraphs) {
+    // Join wrapped lines within the paragraph, collapse whitespace
+    const text = para.replace(/\n/g, " ").replace(/\s+/g, " ").trim();
+    if (!text) continue;
 
-    return true;
-  });
+    // Filter unwanted paragraphs
+    if (text.includes("http")) continue;
+    if (/project\s+gutenberg/i.test(text)) continue;
+    if (/translated\s+by/i.test(text)) continue;
+    if (/copyright/i.test(text)) continue;
+    if (/available\s+online/i.test(text)) continue;
+    if (/acknowledgement/i.test(text)) continue;
+    if (/[-—]{3,}/.test(text)) continue;
+    if (/^book\s+((one|two|three|four|five|six|seven|eight|nine|ten)|[ivxlcdm]+)\s*$/i.test(text)) continue;
 
-  const cleaned = filteredLines.join(" ").replace(/\s+/g, " ").trim();
-  if (!cleaned) return [];
+    // Split into sentences at sentence-ending punctuation
+    const paraSentences = text
+      .split(/(?<=[.!?])\s+/g)
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && /[a-zA-Z]/.test(s));
 
-  return cleaned
-    .split(/(?<=[.!?])\s+/g)
-    .map(s => s.trim())
-    .filter(Boolean);
+    sentences.push(...paraSentences);
+  }
+
+  return sentences;
 }
 
 function escapeHtml(s) {
@@ -85,6 +95,7 @@ function updateProgressCssVar(typedLen, targetLen) {
  * Word-friendly rendering:
  * - keep whitespace as actual break opportunities
  * - still color correctness per character
+ * - shows a blinking underline cursor at the current typing position
  */
 function renderDiff(targetStr, typedStr) {
   updateProgressCssVar(typedStr.length, targetStr.length);
@@ -92,24 +103,37 @@ function renderDiff(targetStr, typedStr) {
   const tokens = targetStr.split(/(\s+)/); // keeps spaces
   let globalIndex = 0;
   const html = [];
+  const cursorPos = typedStr.length; // position of the next character to type
 
   for (const token of tokens) {
     if (!token) continue;
 
     if (/^\s+$/.test(token)) {
-      // preserve spaces; allow wrapping at them
-      html.push(escapeHtml(token).replace(/ /g, "&nbsp;"));
-      globalIndex += token.length;
+      // Render spaces one-by-one so the cursor can land on them
+      for (let i = 0; i < token.length; i++) {
+        const ch = token[i] === " " ? "&nbsp;" : escapeHtml(token[i]);
+        if (globalIndex === cursorPos) {
+          html.push(`<span class="cursor">${ch}</span>`);
+        } else {
+          html.push(ch);
+        }
+        globalIndex++;
+      }
       continue;
     }
 
-    // word-like token; render per-char correctness
+    // word-like token; render per-char correctness + cursor
     for (let i = 0; i < token.length; i++) {
       const expected = token[i];
       const got = typedStr[globalIndex];
+      const isCursor = (globalIndex === cursorPos);
 
       if (got === undefined) {
-        html.push(escapeHtml(expected));
+        if (isCursor) {
+          html.push(`<span class="cursor">${escapeHtml(expected)}</span>`);
+        } else {
+          html.push(escapeHtml(expected));
+        }
       } else if (got === expected) {
         html.push(`<span class="correct">${escapeHtml(expected)}</span>`);
       } else {
