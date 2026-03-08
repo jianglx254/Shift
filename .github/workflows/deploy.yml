@@ -4,6 +4,12 @@ on:
   push:
     branches: ["main"]
 
+# This block gives the action the specific permissions it needs to deploy
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -13,9 +19,8 @@ jobs:
 
       - name: Inject API Key
         run: |
-          # This command finds the placeholder and replaces it with the Secret
+          # Finds the placeholder and swaps it for your secret
           sed -i 's/GEMINI_API_KEY_PLACEHOLDER/${{ secrets.GEMINI_API_KEY }}/g' script.js
-        # Replace 'script.js' with the actual path to your file
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
