@@ -145,6 +145,16 @@ h1{ margin: 0; font-weight: 700; letter-spacing: 0.3px; }
   padding: 0 1px;
 }
 
+.cursor{
+  border-bottom: 3px solid var(--accent);
+  animation: cursor-blink 1s step-end infinite;
+}
+
+@keyframes cursor-blink{
+  0%, 100%{ border-bottom-color: var(--accent); }
+  50%      { border-bottom-color: transparent; }
+}
+
 #input-field{
   opacity: 0;
   position: absolute;
