@@ -23,6 +23,11 @@ let bestWpm = null;
 let _rafId = 0;
 let _pendingTyped = "";
 
+// Pre-allocated DOM nodes for the active sentence (rebuilt once per sentence)
+let _charNodes = [];     // one <span> per target character
+let _charIsSpace = [];   // parallel boolean: true when the char is whitespace
+let _extraSpan = null;   // <span class="incorrect"> for overflow chars
+
 function cleanPhilosophyText(rawText) {
   const normalized = String(rawText ?? "")
     .replace(/\r\n/g, "\n")
@@ -100,66 +105,83 @@ function updateProgressCssVar(typedLen, targetLen) {
 }
 
 /**
+ * Build one <span> per character of the active sentence and append them to
+ * elTarget.  Called once per sentence (in setSentence) so that renderDiff can
+ * update only the nodes that changed instead of rebuilding innerHTML each time.
+ */
+function buildTargetDOM() {
+  const fragment = document.createDocumentFragment();
+  _charNodes = [];
+  _charIsSpace = [];
+
+  for (const token of targetTokens) {
+    if (!token) continue;
+
+    const isSpace = /^\s+$/.test(token);
+    for (let i = 0; i < token.length; i++) {
+      const span = document.createElement("span");
+      span.textContent = token[i];
+      fragment.appendChild(span);
+      _charNodes.push(span);
+      _charIsSpace.push(isSpace);
+    }
+  }
+
+  // Overflow span: shown when the user types past the end of the sentence
+  _extraSpan = document.createElement("span");
+  _extraSpan.className = "incorrect";
+  fragment.appendChild(_extraSpan);
+
+  elTarget.innerHTML = "";
+  elTarget.appendChild(fragment);
+}
+
+/**
  * Word-friendly rendering:
  * - keep whitespace as actual break opportunities
  * - still color correctness per character
  * - shows a blinking underline cursor at the current typing position
+ *
+ * Instead of rebuilding innerHTML each keystroke, we update only the className
+ * (and, for space nodes, textContent) of the nodes that actually changed.
+ * For a typical keystroke this is 2 DOM mutations, regardless of sentence length.
  */
 function renderDiff(targetStr, typedStr) {
   updateProgressCssVar(typedStr.length, targetStr.length);
 
-  const tokens = targetTokens; // use tokens pre-computed in setSentence()
-  let globalIndex = 0;
-  const html = [];
-  const cursorPos = typedStr.length; // position of the next character to type
+  const cursorPos = typedStr.length;
+  const nodes = _charNodes;
+  const len = nodes.length;
 
-  for (const token of tokens) {
-    if (!token) continue;
+  for (let i = 0; i < len; i++) {
+    const node = nodes[i];
+    const isCursor = (i === cursorPos);
+    const got = typedStr[i];
 
-    if (/^\s+$/.test(token)) {
-      // Render spaces one-by-one so the cursor can land on them
-      for (let i = 0; i < token.length; i++) {
-        if (globalIndex === cursorPos) {
-          // Use &nbsp; inside the cursor span so the underline stays visible
-          html.push(`<span class="cursor">&nbsp;</span>`);
-        } else {
-          // Use a regular space so the browser can wrap the line here
-          html.push(token[i] === " " ? " " : escapeHtml(token[i]));
-        }
-        globalIndex++;
-      }
-      continue;
+    let newClass;
+    if (isCursor) {
+      newClass = "cursor";
+    } else if (got === undefined) {
+      newClass = "";
+    } else if (got === targetStr[i]) {
+      newClass = "correct";
+    } else {
+      newClass = "incorrect";
     }
 
-    // word-like token; render per-char correctness + cursor
-    for (let i = 0; i < token.length; i++) {
-      const expected = token[i];
-      const got = typedStr[globalIndex];
-      const isCursor = (globalIndex === cursorPos);
+    if (node.className !== newClass) node.className = newClass;
 
-      if (got === undefined) {
-        if (isCursor) {
-          html.push(`<span class="cursor">${escapeHtml(expected)}</span>`);
-        } else {
-          html.push(escapeHtml(expected));
-        }
-      } else if (got === expected) {
-        html.push(`<span class="correct">${escapeHtml(expected)}</span>`);
-      } else {
-        html.push(`<span class="incorrect">${escapeHtml(expected)}</span>`);
-      }
-
-      globalIndex++;
+    // When the cursor sits on a space the underline must be visible:
+    // swap the space for a non-breaking space so it has visible width.
+    if (_charIsSpace[i]) {
+      const want = isCursor ? "\u00a0" : (targetStr[i] ?? " ");
+      if (node.textContent !== want) node.textContent = want;
     }
   }
 
-  // show extra typed chars (soft incorrect)
-  if (typedStr.length > targetStr.length) {
-    const extra = typedStr.slice(targetStr.length);
-    html.push(`<span class="incorrect">${escapeHtml(extra)}</span>`);
-  }
-
-  elTarget.innerHTML = html.join("");
+  // Extra chars typed beyond the sentence end
+  const extra = typedStr.length > targetStr.length ? typedStr.slice(targetStr.length) : "";
+  if (_extraSpan.textContent !== extra) _extraSpan.textContent = extra;
 }
 
 function resetSentenceProgress() {
@@ -184,6 +206,7 @@ function setSentence(idx) {
   elIdx.textContent = String(sentenceIndex + 1);
   elTotal.textContent = String(sentences.length);
 
+  buildTargetDOM();        // create per-character DOM nodes once for this sentence
   resetSentenceProgress();
 }
 
