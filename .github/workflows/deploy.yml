@@ -14,6 +14,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: write
 
 jobs:
   deploy:
@@ -25,6 +26,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Switch Pages source to GitHub Actions and cancel competing deployments
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Switch Pages source from "Deploy from a branch" to "GitHub Actions workflow".
+          # This prevents GitHub's automatic "pages build and deployment" from running
+          # alongside (and later overwriting) this workflow's API-key-injected deployment.
+          gh api --method PUT /repos/${{ github.repository }}/pages \
+            --field build_type=workflow
+
+          # Cancel any already-queued "pages build and deployment" runs for this commit
+          # so they cannot overwrite our injected deployment after we finish.
+          gh run list \
+            --workflow="pages build and deployment" \
+            --commit "${{ github.sha }}" \
+            --json databaseId,status \
+            --jq '.[] | select(.status != "completed") | .databaseId' \
+          | xargs -r -I{} gh run cancel {}
+
       - name: Inject API Key
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -34,6 +55,21 @@ jobs:
           # in the key are handled safely. The | delimiter avoids conflicts with any /
           # characters that may appear in the key value.
           sed -i "/^const API_KEY = /s|GEMINI_API_KEY_PLACEHOLDER|${GEMINI_API_KEY}|" script.js
+
+          # Verify the assignment line no longer contains the placeholder
+          # (use anchored grep so the guard-check strings on other lines don't cause a false failure).
+          if grep -q '^const API_KEY = "GEMINI_API_KEY_PLACEHOLDER"' script.js; then
+            echo "::error::API key injection failed – placeholder still present in script.js"
+            echo "::error::Ensure the GEMINI_API_KEY secret is set in repository Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          # Verify the injected key is not empty or whitespace-only (catches a missing/empty secret).
+          INJECTED_KEY=$(sed -n 's/^const API_KEY = "\(.*\)";$/\1/p' script.js)
+          if [[ -z "${INJECTED_KEY// }" ]]; then
+            echo "::error::GEMINI_API_KEY secret is empty – add a valid Gemini API key in Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          echo "API key injected successfully."
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
