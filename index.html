@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Stoic Typing — Meditations</title>
+  <title>Shift — Meditations</title>
+
+  <!-- Optional: a dignified serif -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
+
   <link rel="stylesheet" href="style.css" />
 </head>
 
@@ -11,13 +17,13 @@
   <main class="app">
     <header class="header">
       <div>
-        <h1>Stoic Typing</h1>
-        <p class="subtle">Practice with Marcus Aurelius’ <em>Meditations</em>.</p>
+        <h1>Shift</h1>
+        <p class="subtle">Stoic typing practice with Marcus Aurelius’ <em>Meditations</em>.</p>
       </div>
 
-      <div class="header__right">
-        <button id="reload" class="btn" type="button" title="Reload text">Reload</button>
-        <button id="next" class="btn btn--primary" type="button" title="Next sentence">Next</button>
+      <div class="header__right subtle">
+        <span class="hint">Enter: next</span>
+        <span class="hint">Esc: restart</span>
       </div>
     </header>
 
@@ -26,20 +32,29 @@
         <div class="pill">Sentence <span id="idx">–</span>/<span id="total">–</span></div>
         <div class="pill">WPM <span id="wpm">0</span></div>
         <div class="pill">Accuracy <span id="acc">0</span>%</div>
-        <div class="pill subtle">Best: <span id="best">–</span></div>
+        <div class="pill subtle">Best <span id="best">–</span></div>
+        <div class="pill subtle">Focus <span id="focus">–</span></div>
       </div>
 
-      <div id="sentence" class="sentence" aria-live="polite"></div>
+      <div class="typewrap">
+        <div id="typebox" class="typebox" tabindex="0" role="textbox" aria-label="Typing area">
+          <div id="sentence" class="sentence" aria-live="polite"></div>
+          <div id="caret" class="caret" aria-hidden="true"></div>
+        </div>
+      </div>
 
-      <label class="label" for="input">Type here</label>
-      <input id="input" class="input" type="text" autocomplete="off" spellcheck="false"
-             placeholder="Begin typing to start the timer…" />
+      <div class="below">
+        <div id="feedback" class="feedback subtle"></div>
 
-      <div id="feedback" class="feedback subtle"></div>
+        <div class="weak">
+          <div class="weak__title subtle">Slow letters (session)</div>
+          <div id="weakList" class="weak__list subtle">–</div>
+        </div>
+      </div>
     </section>
 
     <footer class="footer subtle">
-      Tip: press <kbd>Enter</kbd> when you finish a sentence.
+      Click the text area to focus. Your stats are kept only for this session (no saving).
     </footer>
   </main>
 
