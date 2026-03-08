@@ -1,4 +1,4 @@
-const API_KEY = "YOUR_KEY_HERE"; // Injected at deploy time — never commit real keys to source control
+const API_KEY = "AIzaSyDuzeYVDeV_N6NwqsfVv4bXUuHBj19xB4M"; // Injected at deploy time — never commit real keys to source control
 
 
 
