@@ -1,4 +1,4 @@
-import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers";
+const API_KEY = "YOUR_KEY_HERE"; // Replace with your Gemini API key — never commit real keys to source control
 
 const TEXT_URL = "texts/meditations.txt";
 const WEAK_KEYS_STORAGE_KEY = "shift_weak_keys";
@@ -33,50 +33,87 @@ const elLoadNotesBtn = document.getElementById("load-notes-btn");
 const elGenerateBtn = document.getElementById("generate-btn");
 const elAiStatus = document.getElementById("ai-status");
 
-// --- AI engine ---
+// --- Loading screen helpers ---
 
-let summarizer = null;
+const elLoadingScreen = document.getElementById("loading-screen");
+const elLoadingBar = document.getElementById("loading-bar");
+
+function showLoading(label) {
+  if (elLoadingScreen) {
+    elLoadingScreen.querySelector(".loading-label").textContent = label || "Neural Link Initializing…";
+    elLoadingBar.style.width = "0%";
+    elLoadingScreen.classList.remove("hidden");
+    // Animate bar to ~85% while work is in progress; JS sets 100% on completion
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => { elLoadingBar.style.width = "85%"; });
+    });
+  }
+}
+
+function hideLoading() {
+  if (elLoadingScreen) {
+    elLoadingBar.style.width = "100%";
+    setTimeout(() => elLoadingScreen.classList.add("hidden"), 350);
+  }
+}
+
+// --- end Loading screen ---
+
+// --- AI engine (Gemini 1.5 Flash) ---
 
 /**
- * Split a paragraph of AI summary text into individual sentences using
- * regex on period and exclamation-mark boundaries.
- * @param {string} text - Paragraph of text from the AI summarizer.
- * @returns {string[]} Array of trimmed non-empty sentence strings.
+ * Send notes text to the Gemini 1.5 Flash API and receive a JSON array of
+ * punchy, standalone study sentences (max 12 words each).
+ * @param {string} text - Raw notes text from the user.
+ * @returns {Promise<string[]>} Array of sentence strings.
  */
-function splitAISummaryIntoSentences(text) {
-  return text
-    .split(/(?<=[.!?])\s+/)
-    .map(s => s.trim())
+async function processNotesWithGemini(text) {
+  const endpoint =
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+
+  const body = {
+    contents: [
+      {
+        parts: [
+          {
+            text:
+              "You are a study expert. Convert these notes into a JSON array of " +
+              "punchy, standalone sentences (max 12 words) for rote memorization. " +
+              "Return ONLY the JSON array.\n\n---NOTES START---\n" + text + "\n---NOTES END---",
+          },
+        ],
+      },
+    ],
+  };
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Gemini API error ${res.status}: ${detail}`);
+  }
+
+  const data = await res.json();
+  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+  // Extract the JSON array — strip markdown fences if present
+  const jsonMatch = raw.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) throw new Error("Could not parse JSON array from Gemini response.");
+
+  const parsed = JSON.parse(jsonMatch[0]);
+  if (!Array.isArray(parsed)) throw new Error("Gemini response is not a JSON array.");
+
+  return parsed
+    .map(s => String(s).trim())
     .filter(s => s.length > 0 && /[a-zA-Z]/.test(s));
 }
 
 /**
- * Initialize the Transformers.js summarization pipeline.
- * Updates the status indicator and enables the Generate button when ready.
- */
-async function initAI() {
-  try {
-    // Xenova/distilbart-cnn-6-6: a compact, fast distilled BART model fine-tuned
-    // on CNN/DailyMail news summarisation. Works well for factual study notes and
-    // runs entirely in-browser via ONNX Runtime (no server required).
-    summarizer = await pipeline("summarization", "Xenova/distilbart-cnn-6-6");
-    if (elAiStatus) {
-      elAiStatus.textContent = "Brain Ready";
-      elAiStatus.classList.add("status--ready");
-    }
-    if (elGenerateBtn) elGenerateBtn.disabled = false;
-  } catch (err) {
-    console.warn("wrote: could not initialize AI pipeline:", err);
-    if (elAiStatus) {
-      elAiStatus.textContent = "AI unavailable";
-      elAiStatus.classList.add("status--error");
-    }
-  }
-}
-
-/**
- * Use the AI summarizer to process the textarea notes, split the result
- * into sentences and restart the typing session with the new content.
+ * Use the Gemini AI to process the textarea notes and restart the typing session.
  */
 async function processNotes() {
   const text = elNotesArea.value.trim();
@@ -85,16 +122,20 @@ async function processNotes() {
     return;
   }
 
+  if (API_KEY === "YOUR_KEY_HERE") {
+    elFeedback.textContent = "Add your Gemini API key (API_KEY) in script.js to use AI generation.";
+    return;
+  }
+
   if (elGenerateBtn) elGenerateBtn.disabled = true;
-  elFeedback.textContent = "Generating study session…";
+  elFeedback.textContent = "";
+  showLoading("Gemini Processing…");
 
   try {
-    const result = await summarizer(text, { min_length: 15, max_length: 60, chunk_batch_size: 1 });
-    const summaryText = result[0]?.summary_text ?? "";
-    const parsed = splitAISummaryIntoSentences(summaryText);
+    const parsed = await processNotesWithGemini(text);
 
     if (!parsed.length) {
-      elFeedback.textContent = "Could not extract sentences from summary. Try more detailed notes.";
+      elFeedback.textContent = "Could not extract sentences. Try more detailed notes.";
       return;
     }
 
@@ -112,8 +153,9 @@ async function processNotes() {
     focusTyping();
   } catch (err) {
     console.error("wrote: AI processing error:", err);
-    elFeedback.textContent = "AI error. Please try again.";
+    elFeedback.textContent = `AI error: ${err.message ?? "Unknown error. Check your API key and network."}`;
   } finally {
+    hideLoading();
     if (elGenerateBtn) elGenerateBtn.disabled = false;
   }
 }
@@ -735,6 +777,15 @@ elFileInput.addEventListener("change", (e) => {
 // --- end Notes panel ---
 
 async function init() {
+  showLoading("Neural Link Initializing…");
+
+  // Enable generate button immediately (Gemini is cloud-based, no local init needed)
+  if (elGenerateBtn) elGenerateBtn.disabled = false;
+  if (elAiStatus) {
+    elAiStatus.textContent = API_KEY === "YOUR_KEY_HERE" ? "No API Key" : "Gemini Ready";
+    elAiStatus.classList.add(API_KEY === "YOUR_KEY_HERE" ? "status--error" : "status--ready");
+  }
+
   elTarget.textContent = "Loading…";
   focusTyping();
 
@@ -751,11 +802,13 @@ async function init() {
       res = await fetch(TEXT_URL);
     } catch {
       elTarget.textContent = "Could not load text file. Paste your notes below to get started.";
+      hideLoading();
       return;
     }
 
     if (!res.ok) {
       elTarget.textContent = "Could not load texts/meditations.txt. Paste your notes below.";
+      hideLoading();
       return;
     }
 
@@ -765,6 +818,7 @@ async function init() {
 
   if (!sentences.length) {
     elTarget.textContent = "No sentences found. Paste your notes below.";
+    hideLoading();
     return;
   }
 
@@ -779,7 +833,116 @@ async function init() {
   updateFocusLettersDisplay();
   updateMasteryDisplay();
   setSentence(pickWeightedRandom());
+
+  hideLoading();
 }
 
+// --- Fluid Geometric Background ---
+
+/**
+ * NetworkAnimation draws a constellation of drifting nodes connected by
+ * faint cyan lines when nodes approach each other.
+ */
+class NetworkAnimation {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
+    this.nodes = [];
+    this.nodeCount = 70;
+    this.linkDist = 160;       // pixels - max distance to draw a connecting line
+    this.rafId = 0;
+
+    this._resize = this._resize.bind(this);
+    window.addEventListener("resize", this._resize);
+    this._resize();
+    this._buildNodes();
+    this._loop();
+  }
+
+  _resize() {
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+  }
+
+  _buildNodes() {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    this.nodes = Array.from({ length: this.nodeCount }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.45,
+      vy: (Math.random() - 0.5) * 0.45,
+      r: 1.5 + Math.random() * 1.5,
+    }));
+  }
+
+  _loop() {
+    this.rafId = requestAnimationFrame(() => this._loop());
+    this._tick();
+  }
+
+  _tick() {
+    const { ctx, canvas, nodes, linkDist } = this;
+    const w = canvas.width;
+    const h = canvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Move nodes with gentle drift; wrap at edges
+    for (const n of nodes) {
+      n.x += n.vx;
+      n.y += n.vy;
+      if (n.x < 0) n.x += w;
+      else if (n.x > w) n.x -= w;
+      if (n.y < 0) n.y += h;
+      else if (n.y > h) n.y -= h;
+    }
+
+    // Draw connecting lines
+    ctx.strokeStyle = "rgba(0,245,255,0.15)";
+    ctx.lineWidth = 0.8;
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const dx = nodes[i].x - nodes[j].x;
+        const dy = nodes[i].y - nodes[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < linkDist) {
+          ctx.globalAlpha = (1 - dist / linkDist) * 0.8;
+          ctx.beginPath();
+          ctx.moveTo(nodes[i].x, nodes[i].y);
+          ctx.lineTo(nodes[j].x, nodes[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw nodes
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = "rgba(0,245,255,0.8)";
+    for (const n of nodes) {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 1;
+  }
+
+  destroy() {
+    cancelAnimationFrame(this.rafId);
+    window.removeEventListener("resize", this._resize);
+  }
+}
+
+// Start the background animation
+const _bgCanvas = document.getElementById("bg-canvas");
+if (_bgCanvas) {
+  // Only start if the user hasn't requested reduced motion
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    new NetworkAnimation(_bgCanvas);
+  }
+}
+
+// --- end Fluid Geometric Background ---
+
 init();
-initAI();

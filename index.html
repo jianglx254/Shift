@@ -8,6 +8,19 @@
 </head>
 
 <body>
+  <!-- Fluid geometric background canvas -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Loading / processing overlay -->
+  <div id="loading-screen" aria-live="polite" aria-label="Loading">
+    <div class="loading-content">
+      <p class="loading-label">Neural Link Initializing…</p>
+      <div class="loading-bar-track">
+        <div id="loading-bar" class="loading-bar"></div>
+      </div>
+    </div>
+  </div>
+
   <main class="app">
     <header class="header">
       <div>
@@ -16,7 +29,7 @@
       </div>
 
       <div class="header__right">
-        <span id="ai-status" class="status-indicator">Loading Brain…</span>
+        <span id="ai-status" class="status-indicator">Gemini AI</span>
         <span class="hint">Enter: next</span>
         <span class="hint">Esc: restart</span>
       </div>
