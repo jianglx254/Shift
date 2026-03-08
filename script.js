@@ -1,4 +1,5 @@
-const API_KEY = window.GEMINI_API_KEY || "REPLACE_ME_AT_BUILD_TIME";
+// The YAML script will look for this exact string
+const API_KEY = "GEMINI_API_KEY_PLACEHOLDER";
 
 
 
