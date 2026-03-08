@@ -1,20 +1,48 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css">
-    <title>Web Typing Trainer</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stoic Typing — Meditations</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
-    <div class="container">
-        <h1>Typing Trainer</h1>
-        <div id="sentence-container"></div>
-        <input type="text" id="input-field" placeholder="Type the sentence here...">
-        <div id="stats-container">
-            WPM: <span id="wpm">0</span> | Accuracy: <span id="accuracy">0%</span>
-        </div>
-    </div>
-    <script src="script.js"></script>
+  <main class="app">
+    <header class="header">
+      <div>
+        <h1>Stoic Typing</h1>
+        <p class="subtle">Practice with Marcus Aurelius’ <em>Meditations</em>.</p>
+      </div>
+
+      <div class="header__right">
+        <button id="reload" class="btn" type="button" title="Reload text">Reload</button>
+        <button id="next" class="btn btn--primary" type="button" title="Next sentence">Next</button>
+      </div>
+    </header>
+
+    <section class="panel">
+      <div class="meta">
+        <div class="pill">Sentence <span id="idx">–</span>/<span id="total">–</span></div>
+        <div class="pill">WPM <span id="wpm">0</span></div>
+        <div class="pill">Accuracy <span id="acc">0</span>%</div>
+        <div class="pill subtle">Best: <span id="best">–</span></div>
+      </div>
+
+      <div id="sentence" class="sentence" aria-live="polite"></div>
+
+      <label class="label" for="input">Type here</label>
+      <input id="input" class="input" type="text" autocomplete="off" spellcheck="false"
+             placeholder="Begin typing to start the timer…" />
+
+      <div id="feedback" class="feedback subtle"></div>
+    </section>
+
+    <footer class="footer subtle">
+      Tip: press <kbd>Enter</kbd> when you finish a sentence.
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
 </body>
 </html>
