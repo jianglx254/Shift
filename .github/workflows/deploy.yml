@@ -20,7 +20,7 @@ jobs:
       - name: Inject API Key
         run: |
           # Finds the placeholder and swaps it for your secret
-          sed -i 's/GEMINI_API_KEY_PLACEHOLDER/${{ secrets.GEMINI_API_KEY }}/g' script.js
+          sed -i "s/GEMINI_API_KEY_PLACEHOLDER/${{ secrets.GEMINI_API_KEY }}/g" script.js
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
