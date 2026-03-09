@@ -843,7 +843,7 @@ elInput.addEventListener("keydown", (e) => {
     e.preventDefault();
     // If the user presses Enter mid-attempt (not yet finished), record the WPM
     // so the average is accurate, then advance to the next sentence.
-    if (!_sentenceFinished && startedAt !== null && elInput.value.length > 0) {
+    if (!_sentenceFinished && startedAt !== null) {
       finishSentence();
     }
     nextSentence();
