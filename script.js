@@ -35,6 +35,9 @@ const elFileInput = document.getElementById("file-input");
 const elLoadNotesBtn = document.getElementById("load-notes-btn");
 const elGenerateBtn = document.getElementById("generate-btn");
 const elAiStatus = document.getElementById("ai-status");
+const elAvgWpm = document.getElementById("avg-wpm");
+const elTopicInput = document.getElementById("topic-input");
+const elTopicBtn = document.getElementById("topic-btn");
 
 // --- Loading screen helpers ---
 
@@ -65,26 +68,20 @@ function hideLoading() {
 // --- AI engine (Gemini 2.5 Flash) ---
 
 /**
- * Send notes text to the Gemini 2.5 Flash API and receive a JSON array of
- * punchy, standalone study sentences (max 12 words each).
- * @param {string} text - Raw notes text from the user.
+ * Send a fully-formed prompt to the Gemini 2.5 Flash API and return a parsed
+ * JSON array of sentence strings.  Shared by both notes-processing and topic
+ * generation flows.
+ * @param {string} promptText - The complete prompt to send to Gemini.
  * @returns {Promise<string[]>} Array of sentence strings.
  */
-async function processNotesWithGemini(text) {
+async function callGeminiForSentences(promptText) {
   const endpoint =
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
 
   const body = {
     contents: [
       {
-        parts: [
-          {
-            text:
-              "You are a study expert. Convert these notes into a JSON array of " +
-              "punchy, standalone sentences (max 12 words) for rote memorization. " +
-              "Return ONLY the JSON array.\n\n---NOTES START---\n" + text + "\n---NOTES END---",
-          },
-        ],
+        parts: [{ text: promptText }],
       },
     ],
   };
@@ -116,6 +113,33 @@ async function processNotesWithGemini(text) {
 }
 
 /**
+ * Send notes text to Gemini and receive a JSON array of punchy study sentences.
+ * @param {string} text - Raw notes text from the user.
+ * @returns {Promise<string[]>} Array of sentence strings.
+ */
+async function processNotesWithGemini(text) {
+  return callGeminiForSentences(
+    "You are a study expert. Convert these notes into a JSON array of " +
+    "punchy, standalone sentences (max 15 words) for rote memorization. " +
+    "Return ONLY the JSON array.\n\n---NOTES START---\n" + text + "\n---NOTES END---"
+  );
+}
+
+/**
+ * Ask Gemini to generate educational study sentences about a given topic.
+ * @param {string} topic - Subject or topic the user wants to study.
+ * @returns {Promise<string[]>} Array of sentence strings.
+ */
+async function generateTopicWithGemini(topic) {
+  return callGeminiForSentences(
+    "You are a study expert. Generate a JSON array of 20 educational, standalone " +
+    "sentences (max 15 words each) covering key facts, concepts, and insights about: " +
+    topic + ". Make each sentence memorable and suitable for rote memorization. " +
+    "Return ONLY the JSON array."
+  );
+}
+
+/**
  * Use the Gemini AI to process the textarea notes and restart the typing session.
  */
 async function processNotes() {
@@ -131,6 +155,7 @@ async function processNotes() {
   }
 
   if (elGenerateBtn) elGenerateBtn.disabled = true;
+  if (elTopicBtn) elTopicBtn.disabled = true;
   elFeedback.textContent = "";
   showLoading("Gemini Processing…");
 
@@ -148,6 +173,7 @@ async function processNotes() {
     saveMastery();
     bestWpm = null;
     elBest.textContent = "–";
+    resetSessionWpm();
     updateWeakKeyDisplay();
     updateFocusLettersDisplay();
     updateMasteryDisplay();
@@ -160,11 +186,78 @@ async function processNotes() {
   } finally {
     hideLoading();
     if (elGenerateBtn) elGenerateBtn.disabled = false;
+    if (elTopicBtn) elTopicBtn.disabled = false;
+  }
+}
+
+/**
+ * Use Gemini AI to generate study sentences for a user-supplied topic and
+ * start a new typing session with those sentences.
+ */
+async function generateTopic() {
+  const topic = elTopicInput ? elTopicInput.value.trim() : "";
+  if (!topic) {
+    elFeedback.textContent = "Please enter a topic before generating.";
+    return;
+  }
+
+  if (API_KEY === "" || API_KEY === "GEMINI_API_KEY_PLACEHOLDER") {
+    elFeedback.textContent = "Add your Gemini API key (API_KEY) in script.js to use AI generation.";
+    return;
+  }
+
+  if (elGenerateBtn) elGenerateBtn.disabled = true;
+  if (elTopicBtn) elTopicBtn.disabled = true;
+  elFeedback.textContent = "";
+  showLoading(`Gemini Generating "${topic}"…`);
+
+  try {
+    const parsed = await generateTopicWithGemini(topic);
+
+    if (!parsed.length) {
+      elFeedback.textContent = "Could not generate sentences for that topic. Try a different topic.";
+      return;
+    }
+
+    sentences = parsed;
+    buildCharMap();
+    initMastery(sentences.length);
+    saveMastery();
+    bestWpm = null;
+    elBest.textContent = "–";
+    resetSessionWpm();
+    updateWeakKeyDisplay();
+    updateFocusLettersDisplay();
+    updateMasteryDisplay();
+    setSentence(pickWeightedRandom());
+    document.getElementById("notes-panel").removeAttribute("open");
+    focusTyping();
+  } catch (err) {
+    console.error("wrote: AI topic generation error:", err);
+    elFeedback.textContent = `AI error: ${err.message ?? "Unknown error. Check your API key and network."}`;
+  } finally {
+    hideLoading();
+    if (elGenerateBtn) elGenerateBtn.disabled = false;
+    if (elTopicBtn) elTopicBtn.disabled = false;
   }
 }
 
 if (elGenerateBtn) {
   elGenerateBtn.addEventListener("click", () => processNotes());
+}
+
+if (elTopicBtn) {
+  elTopicBtn.addEventListener("click", () => generateTopic());
+}
+
+// Allow pressing Enter in the topic input to trigger generation
+if (elTopicInput) {
+  elTopicInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      generateTopic();
+    }
+  });
 }
 
 // --- end AI engine ---
@@ -176,6 +269,9 @@ let target = "";
 let targetTokens = []; // pre-split tokens for the active target sentence
 let startedAt = null;
 let bestWpm = null;
+
+// Session WPM tracking: accumulates WPM for each completed sentence this session
+let sessionWpmList = [];
 
 // Mastery: parallel array to sentences
 let mastery = []; // [{ weight: number, cleared: boolean }]
@@ -431,6 +527,38 @@ function updateMasteryDisplay() {
 
 // --- end Mastery ---
 
+// --- Session WPM helpers ---
+
+/**
+ * Reset the session WPM list and update the average display.
+ * Called whenever a new sentence set is loaded.
+ */
+function resetSessionWpm() {
+  sessionWpmList = [];
+  if (elAvgWpm) elAvgWpm.textContent = "–";
+}
+
+/**
+ * Record a completed-sentence WPM value and refresh the average display.
+ * @param {number} wpm - WPM for the sentence just completed.
+ */
+function recordSessionWpm(wpm) {
+  if (wpm > 0) sessionWpmList.push(wpm);
+  updateAvgWpmDisplay();
+}
+
+function updateAvgWpmDisplay() {
+  if (!elAvgWpm) return;
+  if (!sessionWpmList.length) {
+    elAvgWpm.textContent = "–";
+    return;
+  }
+  const avg = Math.round(sessionWpmList.reduce((sum, wpm) => sum + wpm, 0) / sessionWpmList.length);
+  elAvgWpm.textContent = String(avg);
+}
+
+// --- end Session WPM ---
+
 // --- Custom text persistence ---
 
 /**
@@ -586,7 +714,9 @@ function resetSentenceProgress() {
   startedAt = null;
   _prevTypedLen = 0;
 
-  elWpm.textContent = "0";
+  // WPM is intentionally not reset to "0" here so that the last completed
+  // sentence's WPM stays visible while the user reads the next sentence.
+  // The live WPM display will update as soon as they start typing.
   elAcc.textContent = "0";
   elFeedback.textContent = "";
 
@@ -627,6 +757,9 @@ function finishSentence() {
 
   if (bestWpm === null || wpm > bestWpm) bestWpm = wpm;
   elBest.textContent = bestWpm === null ? "–" : `${bestWpm}`;
+
+  // Record WPM in session history and update rolling average
+  recordSessionWpm(wpm);
 
   // Update mastery for this sentence
   updateMastery(sentenceIndex, wpm, acc);
@@ -743,6 +876,7 @@ function loadUserText(rawText) {
   saveMastery();
   bestWpm = null;
   elBest.textContent = "–";
+  resetSessionWpm();
   loadWeakKeys();
   updateWeakKeyDisplay();
   updateFocusLettersDisplay();
@@ -782,8 +916,9 @@ elFileInput.addEventListener("change", (e) => {
 async function init() {
   showLoading("Neural Link Initializing…");
 
-  // Enable generate button immediately (Gemini is cloud-based, no local init needed)
+  // Enable AI buttons immediately (Gemini is cloud-based, no local init needed)
   if (elGenerateBtn) elGenerateBtn.disabled = false;
+  if (elTopicBtn) elTopicBtn.disabled = false;
   if (elAiStatus) {
     elAiStatus.textContent = (API_KEY === "" || API_KEY === "GEMINI_API_KEY_PLACEHOLDER") ? "No API Key" : "Gemini Ready";
     elAiStatus.classList.add((API_KEY === "" || API_KEY === "GEMINI_API_KEY_PLACEHOLDER") ? "status--error" : "status--ready");
@@ -830,6 +965,7 @@ async function init() {
   bestWpm = null;
   elBest.textContent = "–";
 
+  resetSessionWpm();
   loadWeakKeys();
   loadMastery();
   updateWeakKeyDisplay();
