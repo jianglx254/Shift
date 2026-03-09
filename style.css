@@ -394,6 +394,34 @@ h1{ margin: 0; font-weight: 700; letter-spacing: 0.3px; }
   background: rgba(0,245,255,0.08);
 }
 
+/* --- Topic input row --- */
+
+.topic-row{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.topic-input{
+  flex: 1;
+  min-width: 0;
+  background: rgba(0,0,0,0.22);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 6px 14px;
+  outline: none;
+}
+
+.topic-input::placeholder{ color: var(--muted); }
+
+.topic-input:focus{
+  border-color: rgba(0,245,255,0.55);
+  box-shadow: 0 0 0 3px rgba(0,245,255,0.10);
+}
+
 @media (prefers-reduced-motion: reduce){
   .cursor{ animation: none; opacity: 1; }
   .correct{ animation: none; }

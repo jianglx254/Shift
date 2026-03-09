@@ -38,8 +38,9 @@
     <section class="panel">
       <div id="stats" class="stats" aria-live="polite">
         <span>Sentence <strong id="idx">–</strong>/<strong id="total">–</strong></span>
-        <span>WPM <strong id="wpm">0</strong></span>
-        <span>Accuracy <strong id="acc">0</strong>%</span>
+        <span>WPM <strong id="wpm">–</strong></span>
+        <span>Avg WPM <strong id="avg-wpm">–</strong></span>
+        <span>Accuracy <strong id="acc">–</strong>%</span>
         <span>Best <strong id="best">–</strong></span>
         <span>Weak Key <strong id="weak-key">–</strong></span>
         <span>Focus Letters <strong id="focus-letters">–</strong></span>
@@ -72,6 +73,17 @@
           rows="5"
           aria-label="Paste notes text"
         ></textarea>
+        <div class="topic-row">
+          <input
+            id="topic-input"
+            type="text"
+            class="topic-input"
+            placeholder="Or enter a topic / subject to study…"
+            maxlength="200"
+            aria-label="Topic to generate study sentences about"
+          />
+          <button id="topic-btn" class="btn btn--accent btn--generate" disabled>&#x1F9E0; Generate Topic</button>
+        </div>
         <div class="notes-actions">
           <label class="btn" for="file-input">&#x1F4C2; Load from File</label>
           <input id="file-input" type="file" accept=".txt" aria-label="Upload text file" />
